@@ -44,8 +44,8 @@ use std::env;
 use std::io::{self, Write};
 use std::net::SocketAddr;
 use std::path::Path;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 use std::time::Instant;
 use syslog::Facility;
 
@@ -136,43 +136,56 @@ pub fn get_app<'a, 'b>() -> App<'a, 'b> {
                     SubCommand::with_name("generate-jwt-hs256-server-token")
                         .arg(Arg::from_usage(
                             "--server <SERVER_ADDR> 'Generate a key for the specified server'",
-                        )).arg(
+                        ))
+                        .arg(
                             Arg::from_usage(
                                 "--secret-key [KEY] 'Use specified key to create the token'",
-                            ).required_unless("config"),
-                        ).arg(
+                            )
+                            .required_unless("config"),
+                        )
+                        .arg(
                             Arg::from_usage(
                                 "--config [PATH] 'Use the key from the scheduler config file'",
-                            ).required_unless("secret-key"),
+                            )
+                            .required_unless("secret-key"),
                         ),
-                ).subcommand(
+                )
+                .subcommand(
                     SubCommand::with_name("generate-shared-token").arg(
                         Arg::from_usage(
                             "--bits [BITS] 'Use the specified number of bits of randomness'",
-                        ).default_value("256"),
+                        )
+                        .default_value("256"),
                     ),
                 ),
-            )
+        )
         .subcommand(
             SubCommand::with_name("scheduler")
-                .arg(Arg::from_usage("--config <PATH> 'Use the scheduler config file at PATH'"))
-                .arg(Arg::from_usage("--syslog <LEVEL> 'Log to the syslog with LEVEL'")
-                     .required(false)
-                     .possible_values(LOG_LEVELS))
-                )
+                .arg(Arg::from_usage(
+                    "--config <PATH> 'Use the scheduler config file at PATH'",
+                ))
+                .arg(
+                    Arg::from_usage("--syslog <LEVEL> 'Log to the syslog with LEVEL'")
+                        .required(false)
+                        .possible_values(LOG_LEVELS),
+                ),
+        )
         .subcommand(
             SubCommand::with_name("server")
-                .arg(Arg::from_usage("--config <PATH> 'Use the server config file at PATH'"))
-                .arg(Arg::from_usage("--syslog <LEVEL> 'Log to the syslog with LEVEL'")
-                     .required(false)
-                     .possible_values(LOG_LEVELS))
+                .arg(Arg::from_usage(
+                    "--config <PATH> 'Use the server config file at PATH'",
+                ))
+                .arg(
+                    Arg::from_usage("--syslog <LEVEL> 'Log to the syslog with LEVEL'")
+                        .required(false)
+                        .possible_values(LOG_LEVELS),
+                ),
         )
 }
 
 fn check_init_syslog<'a>(name: &str, matches: &ArgMatches<'a>) {
     if matches.is_present("syslog") {
-        let level = value_t!(matches, "syslog", log::LevelFilter)
-            .unwrap_or_else(|e| e.exit());
+        let level = value_t!(matches, "syslog", log::LevelFilter).unwrap_or_else(|e| e.exit());
         drop(syslog::init(Facility::LOG_DAEMON, level, Some(name)));
     }
 }
@@ -338,7 +351,8 @@ fn run(command: Command) -> Result<i32> {
                         audience.to_owned(),
                         issuer.to_owned(),
                         &jwks_url,
-                    ).chain_err(|| "Failed to create a checker for valid JWTs")?,
+                    )
+                    .chain_err(|| "Failed to create a checker for valid JWTs")?,
                 ),
                 scheduler_config::ClientAuth::Mozilla { required_groups } => {
                     Box::new(token_check::MozillaCheck::new(required_groups))
@@ -381,7 +395,12 @@ fn run(command: Command) -> Result<i32> {
 
             daemonize()?;
             let scheduler = Scheduler::new();
-            let http_scheduler = dist::http::Scheduler::new(public_addr, scheduler, check_client_auth, check_server_auth);
+            let http_scheduler = dist::http::Scheduler::new(
+                public_addr,
+                scheduler,
+                check_client_auth,
+                check_server_auth,
+            );
             void::unreachable(http_scheduler.start()?);
         }
 
@@ -437,7 +456,8 @@ fn run(command: Command) -> Result<i32> {
                 scheduler_url.to_url(),
                 scheduler_auth,
                 server,
-            ).chain_err(|| "Failed to create sccache HTTP server instance")?;
+            )
+            .chain_err(|| "Failed to create sccache HTTP server instance")?;
             void::unreachable(http_server.start()?)
         }
     }
@@ -596,10 +616,9 @@ impl SchedulerIncoming for Scheduler {
                 "Job {} successfully assigned and saved with state {:?}",
                 job_id, state
             );
-            assert!(
-                jobs.insert(job_id, JobDetail { server_id, state })
-                    .is_none()
-            );
+            assert!(jobs
+                .insert(job_id, JobDetail { server_id, state })
+                .is_none());
         }
         let job_alloc = JobAlloc {
             auth,
@@ -725,13 +744,12 @@ impl ServerIncoming for Server {
     type Error = Error;
     fn handle_assign_job(&self, job_id: JobId, tc: Toolchain) -> Result<AssignJobResult> {
         let need_toolchain = !self.cache.lock().unwrap().contains_toolchain(&tc);
-        assert!(
-            self.job_toolchains
-                .lock()
-                .unwrap()
-                .insert(job_id, tc)
-                .is_none()
-        );
+        assert!(self
+            .job_toolchains
+            .lock()
+            .unwrap()
+            .insert(job_id, tc)
+            .is_none());
         let state = if need_toolchain {
             JobState::Pending
         } else {
@@ -766,7 +784,8 @@ impl ServerIncoming for Server {
         Ok(cache
             .insert_with(&tc, |mut file| {
                 io::copy(&mut { tc_rdr }, &mut file).map(|_| ())
-            }).map(|_| SubmitToolchainResult::Success)
+            })
+            .map(|_| SubmitToolchainResult::Success)
             .unwrap_or(SubmitToolchainResult::CannotCache))
     }
     fn handle_run_job(

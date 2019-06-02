@@ -17,22 +17,23 @@
 
 use crate::cache::{storage_from_config, Storage};
 use crate::compiler::{
-    get_compiler_info, CacheControl, CompileResult, Compiler, CompilerKind,
-    CompilerArguments, CompilerHasher, DistType, MissType,
+    get_compiler_info, CacheControl, CompileResult, Compiler, CompilerArguments, CompilerHasher,
+    CompilerKind, DistType, MissType,
 };
 #[cfg(feature = "dist-client")]
 use crate::config;
 use crate::config::Config;
 use crate::dist;
+use crate::jobserver::Client;
+use crate::mock_command::{CommandCreatorSync, ProcessCommandCreator};
+use crate::protocol::{Compile, CompileFinished, CompileResponse, Request, Response};
+use crate::util;
 use filetime::FileTime;
 use futures::sync::mpsc;
 use futures::task::{self, Task};
 use futures::{future, stream, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream};
 use futures_cpupool::CpuPool;
-use crate::jobserver::Client;
-use crate::mock_command::{CommandCreatorSync, ProcessCommandCreator};
 use number_prefix::{binary_prefix, Prefixed, Standalone};
-use crate::protocol::{Compile, CompileFinished, CompileResponse, Request, Response};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::env;
@@ -58,8 +59,7 @@ use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_serde_bincode::{ReadBincode, WriteBincode};
 use tokio_service::Service;
 use tokio_tcp::TcpListener;
-use tokio_timer::{Delay, Timeout};
-use crate::util; //::fmt_duration_as_secs;
+use tokio_timer::{Delay, Timeout}; //::fmt_duration_as_secs;
 
 use crate::errors::*;
 
@@ -430,7 +430,8 @@ impl<C: CommandCreatorSync> SccacheServer<C> {
             tokio::runtime::current_thread::TaskExecutor::current()
                 .spawn_local(Box::new(service.clone().bind(socket).map_err(|err| {
                     error!("{}", err);
-                }))).unwrap();
+                })))
+                .unwrap();
             Ok(())
         });
 
@@ -646,7 +647,8 @@ where
 
         let (sink, stream) = SccacheTransport {
             inner: WriteBincode::new(ReadBincode::new(io)),
-        }.split();
+        }
+        .split();
         let sink = sink.sink_from_err::<Error>();
 
         stream
@@ -662,12 +664,14 @@ where
                         stream::once(Ok(Frame::Message {
                             message,
                             body: true,
-                        })).chain(body.map(|chunk| Frame::Body { chunk: Some(chunk) }))
+                        }))
+                        .chain(body.map(|chunk| Frame::Body { chunk: Some(chunk) }))
                         .chain(stream::once(Ok(Frame::Body { chunk: None }))),
                     ),
                 };
                 Ok(f.from_err::<Error>())
-            }).flatten()
+            })
+            .flatten()
             .forward(sink)
             .map(|_| ())
     }
@@ -974,7 +978,7 @@ impl PerLanguageCount {
         let key = kind.lang_kind().clone();
         let count = match self.counts.get(&key) {
             Some(v) => v + 1,
-            None => 1
+            None => 1,
         };
         self.counts.insert(key, count);
     }
@@ -1097,7 +1101,7 @@ impl ServerStats {
                 sorted_stats.sort_by_key(|v| v.0);
                 for (lang, count) in sorted_stats.iter() {
                     $vec.push((format!("{} ({})", $name, lang), count.to_string(), 0));
-                };
+                }
             }};
         }
 
@@ -1249,7 +1253,7 @@ impl ServerInfo {
 
 enum Frame<R, R1> {
     Body { chunk: Option<R1> },
-    Message { message: R, body: bool, }
+    Message { message: R, body: bool },
 }
 
 struct Body<R> {

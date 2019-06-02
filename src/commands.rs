@@ -12,18 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use atty::Stream;
-use byteorder::{BigEndian, ByteOrder};
 use crate::client::{connect_to_server, connect_with_retry, ServerConnection};
 use crate::cmdline::{Command, StatsFormat};
 use crate::compiler::ColorMode;
 use crate::config::Config;
-use futures::Future;
 use crate::jobserver::Client;
-use log::Level::Trace;
 use crate::mock_command::{CommandChild, CommandCreatorSync, ProcessCommandCreator, RunCommand};
 use crate::protocol::{Compile, CompileFinished, CompileResponse, Request, Response};
 use crate::server::{self, ServerInfo, ServerStartup};
+use crate::util::daemonize;
+use atty::Stream;
+use byteorder::{BigEndian, ByteOrder};
+use futures::Future;
+use log::Level::Trace;
 use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fs::{File, OpenOptions};
@@ -37,7 +38,6 @@ use tokio::runtime::current_thread::Runtime;
 use tokio_io::io::read_exact;
 use tokio_io::AsyncRead;
 use tokio_timer::Timeout;
-use crate::util::daemonize;
 use which::which_in;
 
 use crate::errors::*;
@@ -453,7 +453,8 @@ where
                         io::stderr(),
                         "warning: sccache server looks like it shut down \
                          unexpectedly, compiling locally instead"
-                    ).unwrap();
+                    )
+                    .unwrap();
                 }
                 Err(e) => {
                     return Err(e).chain_err(|| {
@@ -601,7 +602,8 @@ pub fn run_command(cmd: Command) -> Result<i32> {
                     cached_config
                         .with_mut(|c| {
                             c.dist.auth_tokens.insert(auth_url.to_owned(), token);
-                        }).chain_err(|| "Unable to save auth token")?;
+                        })
+                        .chain_err(|| "Unable to save auth token")?;
                     println!("Saved token")
                 }
                 config::DistAuth::Oauth2Implicit {
@@ -618,7 +620,8 @@ pub fn run_command(cmd: Command) -> Result<i32> {
                     cached_config
                         .with_mut(|c| {
                             c.dist.auth_tokens.insert(auth_url.to_owned(), token);
-                        }).chain_err(|| "Unable to save auth token")?;
+                        })
+                        .chain_err(|| "Unable to save auth token")?;
                     println!("Saved token")
                 }
             };
